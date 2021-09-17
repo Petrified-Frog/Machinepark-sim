@@ -1,0 +1,97 @@
+﻿@page "/devices"
+    <h3>Devices</h3>
+
+    <AuthorizeView>
+        <Authorized>
+            @if (devices == null)
+            {
+                <p><em>Loading...</em></p>
+            }
+            else
+            {
+                @foreach (var device in devices)
+                {
+                    <div class="card mb-3">
+                        <div class="card-header font-weight-bold d-flex @BgColour(device)">
+                            @device.DeviceId
+                        </div>
+                        <div class="card-body d-flex">
+                            <div class="col">
+                                <div class="font-weight-bold">Device Id</div>
+                                <div>@device.DeviceName</div>
+                            </div>
+                            <div class="col">
+                                <div class="row">
+                                    <div class="font-weight-bold">Status: </div>
+                                    <div>@device.ConnectionState</div>
+                                    <div class="font-weight-bold">Sending: </div>
+                                    <div>@device.Sending</div>
+                                </div>
+                                <div class="row">
+                                    <div class="font-weight-bold">Data: </div>
+                                    <div>@device.JsonData</div>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <button @onclick="@(e => ToggleSendStateAsync(e, device))">@ButtonText(device)</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </Authorized>
+        <NotAuthorized>
+            <p>You have to log in to see anything important.</p>
+            <a href="authentication/login">Log in</a>
+        </NotAuthorized>
+    </AuthorizeView>
+
+    @code {
+
+        public IotDeviceModel[] devices;
+
+        protected async Task GetDevicesAsync()
+        {
+            devices = await Http.GetFromJsonAsync<IotDeviceModel[]>("https://net21upg3-funcapp.azurewebsites.net/api/GetTwinDevices"); //not active
+        }
+
+        protected override void OnInitialized()
+        {
+            var timer = new Timer(new TimerCallback(_ => InvokeAsync(() => StateHasChanged())), null, 10000, 10000);
+        }
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            Console.WriteLine("Check");
+            await GetDevicesAsync();
+        }
+
+        private string BgColour(IotDeviceModel device)
+        {
+            if (device.ConnectionState == "Online")
+                return "bg-success";
+            else
+                return "bg-danger";
+        }
+
+        private string ButtonText(IotDeviceModel device)
+        {
+            if (device.Sending)
+                return "Stop";
+            else
+                return "Start";
+        }
+
+        private async Task ToggleSendStateAsync(MouseEventArgs e, IotDeviceModel device)
+        {
+            var methodName = "";
+            if (device.Sending)
+                methodName = "stop";
+            else
+                methodName = "start";            
+
+            var response = await Http.PostAsJsonAsync("https://net21upg3-funcapp.azurewebsites.net/api/directmethod", new { DeviceId = device.DeviceId, MethodName = methodName });
+            if (response.IsSuccessStatusCode)
+                Console.WriteLine("200 OK");
+        }
+    }
